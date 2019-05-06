@@ -11,17 +11,27 @@ class MoviesController < ApplicationController
   end
 
   def index
-    @all_ratings = Movie.order(:rating).select(:rating).map(&:rating).uniq
-    @checked_ratings = check
-    @checked_ratings.each do |rating|
-      params[rating] = true
+    @sort_method = params[:sort_by] || session[:sort_by]
+    if params[:sort_by] == 'title'
+        order_params, @title_header={:title => :asc}, 'hilite'
+    elsif params[:sort_by] == 'release_date'
+        order_params, @date_header={:release_date => :asc}, 'hilite'
     end
     
-    if params[:sort]
-      @movies = Movie.order(params[:sort])
-    else
-      @movies = Movie.where(:rating => @checked_ratings)
+    @ratings = Movie.all_ratings
+    @ratings_selected = params[:ratings] || session[:ratings] || {}
+    
+    if @ratings_selected == {}
+      @ratings_selected = Hash[@ratings.map {|rating| [rating, rating]}]
     end
+    
+    if (params[:sort_by] != session[:sort_by]) || (params[:ratings] != session[:ratings])
+      session[:sort_by] = @sort_method
+      session[:ratings] = @ratings_selected
+      redirect_to :sort_by => @sort_method, :ratings => @ratings_selected and return
+    end
+    
+    @movies = Movie.where(:rating => @ratings_selected.keys).order(order_params)
   end
 
   def new
@@ -50,16 +60,6 @@ class MoviesController < ApplicationController
     @movie.destroy
     flash[:notice] = "Movie '#{@movie.title}' deleted."
     redirect_to movies_path
-  end
-  
-  private
-
-  def check
-    if params[:ratings]
-      params[:ratings].keys
-    else
-      @all_ratings
-    end
   end
 
 end
